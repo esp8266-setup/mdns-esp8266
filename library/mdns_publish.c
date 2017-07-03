@@ -33,7 +33,7 @@ static uint16_t mdns_calculate_size(mdnsHandle *handle, mdnsRecordType query) {
             for (uint8_t i = 0; i < handle->numServices; i++) {
                 mdnsService *service = handle->services[i];
 
-                uint8_t serviceNameLen = strlen(service->name) + 1 /* . */ + hostnameLen;
+                uint8_t serviceNameLen = strlen(service->name) + 5 /* '._tcp' or '._udp' */ + 1 /* . */ + hostnameLen;
                 size += serviceNameLen;
                 size += 2 /* type code */ + 2 /* class code */ + 2 /* ttl */ + 2 /* data len */;
 
@@ -42,8 +42,8 @@ static uint16_t mdns_calculate_size(mdnsHandle *handle, mdnsRecordType query) {
                     size += strlen(service->txtRecords[j].name) + 1 /* = */;
                     size += strlen(service->txtRecords[j].value);
                 }
-
-
+            }
+            if (query != mdnsRecordTypeTXT) {
                 fqdnLen = 2;
             }
             break;
@@ -184,18 +184,31 @@ static char *mdns_prepare_response(mdnsHandle *handle, mdnsRecordType query, uin
                     txtLen += strlen(service->txtRecords[j].name) + 1 /* = */;
                     txtLen += strlen(service->txtRecords[j].value);
                 }
-
-                ptr = record_header(
-                    ptr, first, mdnsRecordTypeTXT, ttl,
-                    serviceNameLen + 1 /* . */ + hostnameLen + txtLen
-                );
+                if (txtLen == 0) {
+                    txtLen = 1; // NULL byte sentinel at least
+                }
 
                 // service name
                 memcpy(ptr, service->name, serviceNameLen);
                 ptr += serviceNameLen;
                 *ptr++ = '.';
+                // protocol
+                if (service->protocol == mdnsProtocolTCP) {
+                    memcpy(ptr, "_tcp", 4);
+                } else {
+                    memcpy(ptr, "_udp", 4);
+                }
+                ptr += 4;
+                *ptr++ = '.';
+
+                // hostname
                 memcpy(ptr, handle->hostname, hostnameLen);
                 ptr += hostnameLen;
+
+                ptr = record_header(
+                    ptr, true /* we have a fqdn here, no compressed pointer please */, mdnsRecordTypeTXT, ttl,
+                    serviceNameLen + 1 /* . */ + hostnameLen + txtLen
+                );
 
                 for(uint8_t j = 0; j < service->numTxtRecords; j++) {
                     uint8_t namLen = strlen(service->txtRecords[j].name);
@@ -208,6 +221,11 @@ static char *mdns_prepare_response(mdnsHandle *handle, mdnsRecordType query, uin
                     ptr += valLen;                    
                 }
 
+                if (txtLen == 0) {
+                    *ptr++ = 0; // empty txt record
+                }
+            }
+            if (query != mdnsRecordTypeTXT) {
                 first = false;
             }
             break;
