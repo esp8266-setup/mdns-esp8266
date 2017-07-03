@@ -100,6 +100,8 @@ void mdns_parse_answers(mdnsStreamBuf *buffer, uint16_t numAnswers) {
 //
 
 void mdns_send_queries(mdnsHandle *handle) {
+    // TODO: send outstanding queries
+    
     // send query, setting most significant bit in QClass to zero to get multicast responses
 
     // A DNS-SD query is just a PTR query to _<service>._<protocol>.local

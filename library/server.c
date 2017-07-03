@@ -136,12 +136,12 @@ void mdns_restart(mdnsHandle *handle) {
 
 // Update IP
 void mdns_update_ip(mdnsHandle *handle, struct ip_addr ip) {
-    if (memcmp(&handle->ip, &ip, 4) != 0) {
+    if (memcmp(&handle->ip, &ip, sizeof(struct ip_addr)) != 0) {
         bool restart = handle->started;
         if (restart) {
             mdns_stop(handle);
         }
-        memcpy(&handle->ip, &ip, 4);
+        memcpy(&handle->ip, &ip, sizeof(struct ip_addr));
         if (restart) {
             mdns_start(handle);
         }

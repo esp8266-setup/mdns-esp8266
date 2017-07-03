@@ -83,8 +83,6 @@ static char *mdns_prepare_response(mdnsHandle *handle, mdnsRecordType query, uin
     char *ptr = buffer;
     memset(buffer, 0, *len);
 
-    // TODO: encode packet
-
     // transaction ID
     *ptr++ = transactionID >> 8;
     *ptr++ = transactionID & 0xff;
@@ -240,6 +238,8 @@ void mdns_parse_query(mdnsStreamBuf *buffer, uint16_t numQueries) {
     // - domain name queries
     // - service discovery queries to one of our registered service
     // - browsing queries: _services._dns-sd._udp
+
+    // TODO: parse query
 
     // uint16_t currentType;
     // uint16_t currentClass;

@@ -25,9 +25,3 @@ char *mdns_stream_read_string(mdnsStreamBuf *buffer, uint16_t len) {
     }
     result[len] = '\0';
 }
-
-// destroy stream reader
-void mdns_stream_destroy(mdnsStreamBuf *buffer) {
-    pbuf_free(buffer->bufList);
-    free(buffer);
-}

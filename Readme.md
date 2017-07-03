@@ -39,6 +39,7 @@ The code in `library` is abstracted from the actual hardware by a very thin abst
 - `mdnsUDPHandle`: handle for the UDP connection (socket, LWIP `udp_pcb`, etc.)
 - `mdnsNetworkBuffer`: platform specific buffer type (probably a linked list, etc.)
 - `struct _mdnsStreamBuf`: stream buffer internal state (probably a byte offset and a linked list of buffers)
+- `struct ip_addr`: a IPv4 address (the one from LWIP is fine, just import it)
 
 ### Networking
 
@@ -52,6 +53,7 @@ The code in `library` is abstracted from the actual hardware by a very thin abst
 
 - `mdnsStreamBuf *mdns_stream_new(mdnsNetworkBuffer *buffer)`: create a stream buffer for the platform specific response buffers
 - `uint8_t mdns_stream_read8(mdnsStreamBuf *buffer)`: read a byte from the buffer
+- `void mdns_stream_destroy(mdnsStreamBuf *buffer)`: free stream buffer
 
 ## Legal
 

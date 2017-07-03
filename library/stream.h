@@ -20,7 +20,7 @@ uint32_t mdns_stream_read32(mdnsStreamBuf *buffer);
 // caller has to free response
 char *mdns_stream_read_string(mdnsStreamBuf *buffer, uint16_t len);
 
-// destroy stream reader
+// destroy stream reader (this is implemented in libplatform)
 void mdns_stream_destroy(mdnsStreamBuf *buffer);
 
 #endif /* mdns_stream_h_included */

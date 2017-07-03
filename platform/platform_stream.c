@@ -41,3 +41,9 @@ uint8_t mdns_stream_read8(mdnsStreamBuf *buffer) {
     char *payload = buffer->bufList->payload;
     return payload[buffer->currentPosition++];
 }
+
+// destroy stream reader
+void mdns_stream_destroy(mdnsStreamBuf *buffer) {
+    pbuf_free(buffer->bufList);
+    free(buffer);
+}
