@@ -7,7 +7,7 @@
 
 // Enable query API (Disabled by default)
 #ifndef MDNS_ENABLE_QUERY
-// #define MDNS_ENABLE_QUERY 1
+#define MDNS_ENABLE_QUERY 1
 #endif
 
 // Enable publishing API
@@ -16,7 +16,7 @@
 #endif
 
 #include <stdint.h>
-
+#include "platform.h"
 
 //
 // MDNS service
@@ -39,6 +39,9 @@ void mdns_restart(mdnsHandle *handle);
 
 // Destroy MDNS handle
 void mdns_destroy(mdnsHandle *handle);
+
+// Set IP address of station, call this in the DHCP callback to update IP
+void mdns_update_ip(mdnsHandle *handle, struct ip_addr ip);
 
 
 //
@@ -76,7 +79,7 @@ typedef struct _mdnsService {
 #if defined(MDNS_ENABLE_QUERY) && MDNS_ENABLE_QUERY
     // IP address of the service
     // only used when this is a query response
-    uint8_t ip[4];
+    struct ip_addr ip;
 #endif
 } mdnsService;
 

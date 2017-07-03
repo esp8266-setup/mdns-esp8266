@@ -13,7 +13,7 @@
 #
 ifndef PDIR
 UP_EXTRACT_DIR = ..
-GEN_LIBS = libmdns.a
+GEN_LIBS = libplatform.a
 endif
 
 
@@ -38,7 +38,7 @@ endif
 # Required for each makefile to inherit from the parent
 #
 
-INCLUDES := $(INCLUDES) -I $(PDIR)include -I $(PDIR)../platform
+INCLUDES := $(INCLUDES) -I $(PDIR)include -I $(PDIR)../library
 INCLUDES += -I ./
 PDIR := ../$(PDIR)
 sinclude $(PDIR)Makefile

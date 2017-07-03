@@ -1,41 +1,7 @@
 #include "stream.h"
 #include <stdlib.h>
 
-struct _mdnsStreamBuf {
-    struct pbuf *bufList;
-    uint16_t currentPosition;
-};
-
-// create stream reader
-mdnsStreamBuf *mdns_stream_new(struct pbuf *buffer) {
-    mdnsStreamBuf *buf = malloc(sizeof(mdnsStreamBuf));
-    pbuf_ref(buffer);
-
-    buf->bufList = buffer;
-    buf->currentPosition = 0;
-}
-
-bool mdns_advance_buffer(mdnsStreamBuf *buffer) {
-    struct pbuf *next = buffer->bufList->next;
-    if (next == NULL) {
-        return false;
-    }
-    pbuf_ref(next);
-    pbuf_free(buffer->bufList);
-    buffer->bufList = next;
-    buffer->currentPosition = 0;
-
-    return true;
-}
-
-// read byte from stream
-uint8_t mdns_stream_read8(mdnsStreamBuf *buffer) {
-    if (buffer->currentPosition >= buffer->bufList->len - 1) {
-        mdns_advance_buffer(buffer);
-    }
-    char *payload = buffer->bufList->payload;
-    return payload[buffer->currentPosition++];
-}
+#include "platform.h"
 
 // read 16 bit int from stream
 uint16_t mdns_stream_read16(mdnsStreamBuf *buffer) {

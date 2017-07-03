@@ -3,12 +3,10 @@
 #include <mdns/mdns.h>
 #include "server.h"
 
-
-
 #if defined(MDNS_ENABLE_QUERY) && MDNS_ENABLE_QUERY
 
 mdnsQueryHandle *mdns_query(mdnsHandle *handle, char *service, mdnsProtocol protocol, mdnsQueryCallback *callback) {
-    mndsQueryHandle *qHandle = malloc(sizeof(mdnsQueryHandle));
+    mdnsQueryHandle *qHandle = malloc(sizeof(mdnsQueryHandle));
     
     // copy over service name
     uint8_t serviceLen = strlen(service);

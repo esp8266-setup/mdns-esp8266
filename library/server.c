@@ -1,7 +1,9 @@
 #include <mdns/mdns.h>
 #include <ctype.h>
 
-#include "mdns_impl.h"
+#include "mdns_network.h"
+#include "mdns_query.h"
+#include "mdns_publish.h"
 #include "server.h"
 
 void mdns_server_task(void *userData) {
@@ -20,25 +22,33 @@ void mdns_server_task(void *userData) {
                     // start up service
                     mdns_join_multicast_group();
                     handle->pcb = mdns_listen(handle);
+#if defined(MDNS_ENABLE_PUBLISH) && MDNS_ENABLE_PUBLISH
                     // and announce the services on the network
                     mdns_announce(handle);
+#endif
+                    handle->started = true;
                     break;
 
                 case mdnsTaskActionStop:
                     // cleanly shut down, this means sending a goodbye message
+#if defined(MDNS_ENABLE_PUBLISH) && MDNS_ENABLE_PUBLISH
                     mdns_goodbye(handle);
+#endif
                     // shutdown socket
                     mdns_shutdown_socket(handle->pcb);
                     handle->pcb = NULL;
                     mdns_leave_multicast_group();
                     // notify parent and destroy this task
                     xQueueSendToBack(handle->mdnsQueue, (void *)mdnsTaskActionDestroy, portMAX_DELAY);
+                    handle->started = false;
                     vTaskDelete(NULL);
                     break;
 
                 case mdnsTaskActionRestart:
                     // just force an announcement
+#if defined(MDNS_ENABLE_PUBLISH) && MDNS_ENABLE_PUBLISH
                     mdns_announce(handle);
+#endif
                     break;
                 
 #if defined(MDNS_ENABLE_QUERY) && MDNS_ENABLE_QUERY
@@ -94,7 +104,9 @@ mdnsHandle *mdns_create(char *hostname) {
         handle->hostname[i] = tolower(hostname[i]);
     }
     handle->hostname[hostnameLen] = '\0';
-
+    
+    handle->started = false;
+    
     handle->mdnsQueue = xQueueCreate(1, sizeof(mdnsTaskAction));
 }
 
@@ -120,6 +132,20 @@ void mdns_stop(mdnsHandle *handle) {
 // Restart MDNS service (call on IP/Network change)
 void mdns_restart(mdnsHandle *handle) {
     xQueueSendToBack(handle->mdnsQueue, (void *)mdnsTaskActionRestart, portMAX_DELAY);
+}
+
+// Update IP
+void mdns_update_ip(mdnsHandle *handle, struct ip_addr ip) {
+    if (memcmp(&handle->ip, &ip, 4) != 0) {
+        bool restart = handle->started;
+        if (restart) {
+            mdns_stop(handle);
+        }
+        memcpy(&handle->ip, &ip, 4);
+        if (restart) {
+            mdns_start(handle);
+        }
+    }
 }
 
 // Destroy MDNS handle

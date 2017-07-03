@@ -5,7 +5,7 @@
 #include <freertos/queue.h>
 #include <freertos/task.h>
 
-#include <lwip/udp.h>
+#include "platform.h"
 
 #include <mdns/mdns.h>
 
@@ -23,10 +23,14 @@ struct _mdnsHandle {
     xQueueHandle mdnsQueue;
 
     // UDP port handle
-    struct udp_pcb *pcb;
+    mdnsUDPHandle *pcb;
+
+    // IP address handle
+    struct ip_addr ip;
+    bool started;
 
 #if defined(MDNS_ENABLE_QUERY) && MDNS_ENABLE_QUERY
-    mdnsQuery **queries;
+    mdnsQueryHandle **queries;
     uint8_t numQueries;
 #endif
 };

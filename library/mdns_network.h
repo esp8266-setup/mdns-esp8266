@@ -1,11 +1,8 @@
 #ifndef mdns_mdns_impl_h_included
 #include <mdns/mdns.h>
 
-#include <lwip/opt.h>
-#include <lwip/udp.h>
-#include <lwip/inet.h>
-#include <lwip/igmp.h>
-#include <lwip/mem.h>
+#include "platform.h"
+#include "stream.h"
 
 #define MDNS_MULTICAST_ADDR 0xe00000fb
 #define MDNS_MULTICAST_TTL 60 /* seconds */
@@ -56,28 +53,23 @@ typedef enum _mdnsRecordType {
     mdnsRecordTypeAAAA = 0x1c
 } mdnsRecordType;
 
+//
+// Network related (this is implemented in libplatform)
+//
 
-// Network related
+// join multicast group
 bool mdns_join_multicast_group(void);
+
+// leave multicast group
 bool mdns_leave_multicast_group(void);
-struct udp_pcb *mdns_listen(mdnsHandle *handle);
-void mdns_shutdown_socket(struct udp_pcb *pcb);
 
-// MDNS related
-void mdns_announce(mdnsHandle *handle);
-void mdns_goodbye(mdnsHandle *handle);
+// listen to multicast messages
+mdnsUDPHandle *mdns_listen(mdnsHandle *handle);
 
-#if 0
-#define MDNS_NAME_REF   0xC000
+// stop listening
+void mdns_shutdown_socket(mdnsUDPHandle *pcb);
 
-#define MDNS_CLASS_IN             0x0001
-#define MDNS_CLASS_IN_FLUSH_CACHE 0x8001
-
-#define MDNS_ANSWERS_ALL  0x0F
-#define MDNS_ANSWER_PTR   0x08
-#define MDNS_ANSWER_TXT   0x04
-#define MDNS_ANSWER_SRV   0x02
-#define MDNS_ANSWER_A     0x01
-#endif
+// parse and dispatch a packet (implemented here)
+void mdns_parse_packet(mdnsHandle *handle, mdnsStreamBuf *buffer, ip_addr_t *ip, uint16_t port);
 
 #endif /* mdns_mdns_impl_h_included */
