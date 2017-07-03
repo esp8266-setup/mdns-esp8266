@@ -10,7 +10,7 @@ See the header file `include/mdns/mdns.h` for documentation.
 
 TODO
 
-## Building
+## Building for esp8266
 
 Some pointers:
 
@@ -29,6 +29,29 @@ Some pointers:
 5. Switch to the base directory and run `make`
 6. Grab the library from `.output/lib/libmdns.a`
 7. Grab the headers from `include/*.h`
+
+## Other platforms
+
+The code in `library` is abstracted from the actual hardware by a very thin abstraction layer which is defined in `platform`. To adapt the mdns service to another platform you will have to exchange the Makefiles and supply implementations for the following functions in `libplatform`:
+
+### Types
+
+- `mdnsUDPHandle`: handle for the UDP connection (socket, LWIP `udp_pcb`, etc.)
+- `mdnsNetworkBuffer`: platform specific buffer type (probably a linked list, etc.)
+- `struct _mdnsStreamBuf`: stream buffer internal state (probably a byte offset and a linked list of buffers)
+
+### Networking
+
+- `bool mdns_join_multicast_group(void)`: join the MDNS multicast group
+- `bool mdns_leave_multicast_group(void)`: leave the MDNS multicast group
+- `mdnsUDPHandle *mdns_listen(mdnsHandle *handle)`: listen to packets from the multicast group and connect
+- `uint16_t mdns_send_udp_packet(mdnsHandle *handle, char *data, uint16_t len)`: send UDP payload
+- `void mdns_shutdown_socket(mdnsUDPHandle *pcb)`: shutdown a socket
+
+### Buffer handling
+
+- `mdnsStreamBuf *mdns_stream_new(mdnsNetworkBuffer *buffer)`: create a stream buffer for the platform specific response buffers
+- `uint8_t mdns_stream_read8(mdnsStreamBuf *buffer)`: read a byte from the buffer
 
 ## Legal
 

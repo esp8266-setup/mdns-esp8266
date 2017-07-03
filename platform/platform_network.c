@@ -66,6 +66,13 @@ mdnsUDPHandle *mdns_listen(mdnsHandle *handle) {
     return pcb;
 }
 
+uint16_t mdns_send_udp_packet(mdnsHandle *handle, char *data, uint16_t len) {
+    struct pbuf * buf = pbuf_alloc(PBUF_IP, len, PBUF_RAM);
+    pbuf_take(buf, data, len);
+    // TODO: actually send it
+    return len;
+}
+
 void mdns_shutdown_socket(mdnsUDPHandle *pcb) {
     udp_disconnect(pcb);
     udp_remove(pcb);

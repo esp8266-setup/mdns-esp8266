@@ -228,8 +228,7 @@ static char *mdns_prepare_response(mdnsHandle *handle, mdnsRecordType query, uin
 static void send_mdns_response_packet(mdnsHandle *handle, uint16_t ttl, uint16_t transactionID) {
     uint16_t responseLen = 0;
     char *response = mdns_prepare_response(handle, mdnsRecordTypePTR, ttl, transactionID, &responseLen);
-    struct pbuf * buf = pbuf_alloc(PBUF_IP, responseLen, PBUF_RAM);
-    pbuf_take(buf, response, responseLen);
+    mdns_send_udp_packet(handle, response, responseLen);
 }
 
 //
