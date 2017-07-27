@@ -23,7 +23,8 @@ GEN_BINS= eagle.app.v6.bin
 SPECIAL_MKTARGETS=$(APP_MKTARGETS)
 SUBDIRS=    \
 	library \
-	platform
+	platform \
+	demo
 
 endif # } PDIR
 
@@ -47,7 +48,8 @@ endif
 
 COMPONENTS_eagle.app.v6 = \
 	library/libmdns.a \
-	platform/libplatform.a
+	platform/libplatform.a \
+	demo/libuser.a
 
 LINKFLAGS_eagle.app.v6 = \
 	-L$(SDK_PATH)/lib        \
@@ -126,6 +128,7 @@ DDEFINES +=				\
 
 INCLUDES := $(INCLUDES) -I $(PDIR)include
 INCLUDES += -I $(SDK_PATH)/include/lwip/posix
+INCLUDES += -I $(PDIR)platform
 sinclude $(SDK_PATH)/Makefile
 
 .PHONY: FORCE
