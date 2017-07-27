@@ -58,7 +58,7 @@
         os_printf(_title "\n"); \
         for (uint16_t i = 0; i < (_len); i++) { \
             os_printf("%02x ", (_data)[i]); \
-            if (i % 16 == 0) { \
+            if ((i + 1) % 16 == 0) { \
                 os_printf("\n"); \
             } \
         } \
