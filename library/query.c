@@ -3,7 +3,7 @@
 #include <mdns/mdns.h>
 #include "server.h"
 
-#if defined(MDNS_ENABLE_QUERY) && MDNS_ENABLE_QUERY
+#if MDNS_ENABLE_QUERY
 
 mdnsQueryHandle *mdns_query(mdnsHandle *handle, char *service, mdnsProtocol protocol, mdnsQueryCallback *callback) {
     mdnsQueryHandle *qHandle = malloc(sizeof(mdnsQueryHandle));

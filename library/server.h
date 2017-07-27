@@ -29,7 +29,7 @@ struct _mdnsHandle {
     struct ip_addr ip;
     bool started;
 
-#if defined(MDNS_ENABLE_QUERY) && MDNS_ENABLE_QUERY
+#if MDNS_ENABLE_QUERY
     mdnsQueryHandle **queries;
     uint8_t numQueries;
 #endif
@@ -40,13 +40,13 @@ typedef enum _mdnsTaskAction {
     mdnsTaskActionStart,
     mdnsTaskActionStop,
     mdnsTaskActionRestart,
-#if defined(MDNS_ENABLE_QUERY) && MDNS_ENABLE_QUERY
+#if MDNS_ENABLE_QUERY
     mdnsTaskActionQuery,
 #endif
     mdnsTaskActionDestroy
 } mdnsTaskAction;
 
-#if defined(MDNS_ENABLE_QUERY) && MDNS_ENABLE_QUERY
+#if MDNS_ENABLE_QUERY
 void mdns_add_query(mdnsHandle *handle, mdnsQueryHandle *query);
 void mdns_remove_query(mdnsHandle *handle, mdnsQueryHandle *query);
 #endif /* MDNS_ENABLE_QUERY */

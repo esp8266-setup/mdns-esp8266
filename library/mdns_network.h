@@ -70,6 +70,8 @@ mdnsUDPHandle *mdns_listen(mdnsHandle *handle);
 void mdns_shutdown_socket(mdnsUDPHandle *pcb);
 
 // parse and dispatch a packet (implemented here)
+#if !MDNS_BROADCAST_ONLY
 void mdns_parse_packet(mdnsHandle *handle, mdnsStreamBuf *buffer, ip_addr_t *ip, uint16_t port);
+#endif /* !MDNS_BROADCAST_ONLY */
 
 #endif /* mdns_mdns_impl_h_included */

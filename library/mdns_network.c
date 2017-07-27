@@ -6,6 +6,7 @@
 #include "stream.h"
 #include "server.h"
 
+#if !MDNS_BROADCAST_ONLY
 void mdns_parse_packet(mdnsHandle *handle, mdnsStreamBuf *buffer, ip_addr_t *ip, uint16_t port) {
     uint16_t transactionID = mdns_stream_read16(buffer);
     uint16_t flagsTmp = mdns_stream_read16(buffer);
@@ -41,3 +42,4 @@ void mdns_parse_packet(mdnsHandle *handle, mdnsStreamBuf *buffer, ip_addr_t *ip,
 #endif /* MDNS_ENABLE_PUBLISH */
     }
 }
+#endif /* !MDNS_BROADCAST_ONLY */

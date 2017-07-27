@@ -15,6 +15,16 @@
 #define MDNS_ENABLE_PUBLISH 1
 #endif
 
+// Broadcast only API ?
+#ifndef MDNS_BROADCAST_ONLY
+#define MDNS_BROADCAST_ONLY 0
+#endif
+
+#if MDNS_BROADCAST_ONLY
+#undef MDNS_ENABLE_QUERY
+#define MDNS_ENABLE_QUERY 0
+#endif /* MDNS_BROADCAST_ONLY */
+
 #include <stdint.h>
 #include "platform.h"
 

@@ -3,7 +3,7 @@
 
 #include <mdns/mdns.h>
 
-#if defined(MDNS_ENABLE_QUERY) && MDNS_ENABLE_QUERY
+#if MDNS_ENABLE_QUERY
 
 typedef struct _mdnsQueryHandle {
     char *service;

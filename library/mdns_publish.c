@@ -2,7 +2,7 @@
 // PUBLISH
 //
 
-#if defined(MDNS_ENABLE_PUBLISH) && MDNS_ENABLE_PUBLISH
+#if MDNS_ENABLE_PUBLISH
 
 static uint16_t mdns_calculate_size(mdnsHandle *handle, mdnsRecordType query) {
     uint8_t hostnameLen = strlen(handle->hostname);
@@ -252,6 +252,7 @@ static void send_mdns_response_packet(mdnsHandle *handle, uint16_t ttl, uint16_t
 //
 
 void mdns_parse_query(mdnsStreamBuf *buffer, uint16_t numQueries) {
+#if !MDNS_BROADCAST_ONLY
     // we have to react to:
     // - domain name queries
     // - service discovery queries to one of our registered service
@@ -306,6 +307,7 @@ void mdns_parse_query(mdnsStreamBuf *buffer, uint16_t numQueries) {
     // return _replyToInstanceRequest(questionMask, responseMask, serviceName, protoName, servicePort, interface);
 
 }
+#endif /* !MDNS_BROADCAST_ONLY */
 
 void mdns_announce(mdnsHandle *handle) {
     // respond with our data, setting most significant bit in RRClass to update caches

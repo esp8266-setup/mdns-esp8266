@@ -11,6 +11,8 @@ uint16_t mdns_send_udp_packet(mdnsHandle *handle, char *data, uint16_t len);
 
 // parse mdns query and react to it
 void mdns_parse_query(mdnsStreamBuf *buffer, uint16_t numQueries);
+#if !MDNS_BROADCAST_ONLY
+#endif
 
 // announce services
 void mdns_announce(mdnsHandle *handle);

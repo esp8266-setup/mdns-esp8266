@@ -2,7 +2,7 @@
 // QUERY
 //
 
-#if defined(MDNS_ENABLE_QUERY) && MDNS_ENABLE_QUERY
+#if MDNS_ENABLE_QUERY
 void mdns_parse_answers(mdnsStreamBuf *buffer, uint16_t numAnswers) {
     char *serviceName[4];
 
