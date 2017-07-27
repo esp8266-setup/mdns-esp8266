@@ -1,9 +1,15 @@
+#include <mdns/mdns.h>
+#include "mdns_query.h"
+#include "mdns_network.h"
+
 //
 // QUERY
 //
 
 #if MDNS_ENABLE_QUERY
 void mdns_parse_answers(mdnsStreamBuf *buffer, uint16_t numAnswers) {
+    LOG(TRACE, "mdns: Parsing %d answers", numAnswers);
+
     char *serviceName[4];
 
     while (numAnswers--) {
@@ -25,6 +31,11 @@ void mdns_parse_answers(mdnsStreamBuf *buffer, uint16_t numAnswers) {
             stringsRead++;
         } while (true);
 
+#if DEBUG_LEVEL <= TRACE
+        for (uint8_t i = 0; i < stringsRead; i++) {
+            LOG(TRACE, "mdns: serviceName[%d] = %s", i, serviceName[i]);
+        }
+#endif
 
         mdnsRecordType answerType = mdns_stream_read16(buffer);
         uint16_t answerClass = mdns_stream_read16(buffer) & 0x7f; // mask out top bit: cache buster flag
@@ -34,6 +45,7 @@ void mdns_parse_answers(mdnsStreamBuf *buffer, uint16_t numAnswers) {
         switch(answerType) {
             case mdnsRecordTypeA: { // IPv4 Address
                 uint32_t answerIP = mdns_stream_read32(buffer);
+                LOG(TRACE, "mdns: Answer -> A: %d.%d.%d.%d", (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, ip & 0xff );
                 // TODO: do something with IP
             }
             case mdnsRecordTypePTR: { // Reverse lookup aka. Hostname
@@ -42,6 +54,7 @@ void mdns_parse_answers(mdnsStreamBuf *buffer, uint16_t numAnswers) {
                     free(hostname); // Compressed pointer (not supported)
                 }
                 // TODO: do something with hostname
+                LOG(TRACE, "mdns: Answer -> PTR: %s", hostname);
                 free(hostname);
             }
             case mdnsRecordTypeTXT: { // Text records
@@ -65,6 +78,12 @@ void mdns_parse_answers(mdnsStreamBuf *buffer, uint16_t numAnswers) {
                 }
 
                 // TODO: do something with txt records
+#if DEBUG_LEVEL <= TRACE
+                LOG(TRACE, "mdns: Answer -> TXT (%d records):", numRecords);
+                for(uint8_t i = 0; i < numRecords; i++) {
+                    LOG(TRACE, "mdns: - %s", txt[i]);
+                }
+#endif
 
                 if (numRecords > 0) {
                     for (uint8_t i; i < numRecords; i++) {
@@ -80,10 +99,17 @@ void mdns_parse_answers(mdnsStreamBuf *buffer, uint16_t numAnswers) {
 
                 uint16_t hostnameLen = mdns_stream_read16(buffer);
                 char *hostname = mdns_stream_read_string(buffer, hostnameLen);
+
                 // TODO: do something with service data
+                LOG(TRACE, "mdns: Answer -> SRV: %s", hostname);
+
                 free(hostname);               
             }
+
             case mdnsRecordTypeAAAA:
+                LOG(TRACE, "mdns: Answer -> AAAA: skipping");
+                // fallthrough
+
             default:
                 // Ignore these, just skip over the buffer
                 for (uint16_t i = 0; i < dataLength; i++) {
@@ -100,6 +126,8 @@ void mdns_parse_answers(mdnsStreamBuf *buffer, uint16_t numAnswers) {
 //
 
 void mdns_send_queries(mdnsHandle *handle) {
+    LOG(DEBUG, "mdns: Sending queries NOT IMPLEMENTED");
+
     // TODO: send outstanding queries
     
     // send query, setting most significant bit in QClass to zero to get multicast responses

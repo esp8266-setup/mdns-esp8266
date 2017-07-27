@@ -5,80 +5,104 @@
 #include "mdns_query.h"
 #include "mdns_publish.h"
 #include "server.h"
+#include "debug.h"
 
 void mdns_server_task(void *userData) {
     mdnsHandle *handle = userData;
     mdnsTaskAction action = mdnsTaskActionNone;
+    int tmp;
+    LOG(TRACE, "mdns: Service task started");    
 
     while (1) {
-        if (xQueuePeek(handle->mdnsQueue, &action, 0) == pdPASS) {
-            if (action == mdnsTaskActionDestroy) {
-                continue; // destroy messages are for the caller, not for us
-            }
-            xQueueReceive(handle->mdnsQueue, &action, portMAX_DELAY);
+        LOG(TRACE, "mdns: task waiting");
+        xQueueReceive(handle->mdnsQueue, &tmp, portMAX_DELAY);
+        action = (mdnsTaskAction)tmp;
 
-            switch (action) {
-                case mdnsTaskActionStart:
-                    // start up service
-                    mdns_join_multicast_group();
-                    handle->pcb = mdns_listen(handle);
-#if defined(MDNS_ENABLE_PUBLISH) && MDNS_ENABLE_PUBLISH
-                    // and announce the services on the network
-                    mdns_announce(handle);
-#endif
-                    handle->started = true;
-                    break;
+        // destroy messages are for the caller, not for us
+        if (action == mdnsTaskActionDestroy) {
+            LOG(TRACE, "mdns: task reinserting destroy message");
+    
+            // re-insert into queue
+            xQueueSendToBack(handle->mdnsQueue, &action, portMAX_DELAY);
 
-                case mdnsTaskActionStop:
-                    // cleanly shut down, this means sending a goodbye message
-#if defined(MDNS_ENABLE_PUBLISH) && MDNS_ENABLE_PUBLISH
-                    mdns_goodbye(handle);
-#endif
-                    // shutdown socket
-                    mdns_shutdown_socket(handle->pcb);
-                    handle->pcb = NULL;
-                    mdns_leave_multicast_group();
-                    // notify parent and destroy this task
-                    xQueueSendToBack(handle->mdnsQueue, (void *)mdnsTaskActionDestroy, portMAX_DELAY);
-                    handle->started = false;
-                    vTaskDelete(NULL);
-                    break;
+            // give up time slot
+            taskYIELD();
 
-                case mdnsTaskActionRestart:
-                    // just force an announcement
-#if defined(MDNS_ENABLE_PUBLISH) && MDNS_ENABLE_PUBLISH
-                    mdns_announce(handle);
+            continue;
+        }
+
+        LOG(TRACE, "mdns: task signaled %d", action);
+
+        switch (action) {
+            case mdnsTaskActionStart:
+                // start up service
+                if (!mdns_join_multicast_group()) {
+                    LOG(ERROR, "mdns: Joining multicast group failed");
+                }
+                handle->pcb = mdns_listen(handle);
+#if MDNS_ENABLE_PUBLISH
+                // and announce the services on the network
+                mdns_announce(handle);
 #endif
-                    break;
-                
-#if defined(MDNS_ENABLE_QUERY) && MDNS_ENABLE_QUERY
-                case mdnsTaskActionQuery:
-                    // send all registered queries
-                    mdns_send_queries(handle);
-                    break;
+                handle->started = true;
+                break;
+
+            case mdnsTaskActionStop:
+                // cleanly shut down, this means sending a goodbye message
+#if MDNS_ENABLE_PUBLISH
+                mdns_goodbye(handle);
+#endif
+                // shutdown socket
+                mdns_shutdown_socket(handle->pcb);
+                handle->pcb = NULL;
+                if (!mdns_leave_multicast_group()) {
+                    LOG(ERROR, "mdns: Leaving multicast group failed");
+                }
+                // notify parent and destroy this task
+                action = mdnsTaskActionDestroy;
+                xQueueSendToBack(handle->mdnsQueue, &action, portMAX_DELAY);
+                handle->started = false;
+                vTaskDelete(NULL);
+                break;
+
+            case mdnsTaskActionRestart:
+                // just force an announcement
+#if MDNS_ENABLE_PUBLISH
+                mdns_announce(handle);
+#endif
+                break;
+            
+#if MDNS_ENABLE_QUERY
+            case mdnsTaskActionQuery:
+                // send all registered queries
+                mdns_send_queries(handle);
+                break;
 #endif /* MDNS_ENABLE_QUERY */
 
-                default:
-                    break;
-            }
+            default:
+                break;
         }
     }
 }
 
-#if defined(MDNS_ENABLE_QUERY) && MDNS_ENABLE_QUERY
+#if MDNS_ENABLE_QUERY
 void mdns_add_query(mdnsHandle *handle, mdnsQueryHandle *query) {
     // TODO: mutex lock handle->queries
     handle->queries = realloc(handle->queries, sizeof(mdnsQueryHandle *) * (handle->numQueries + 1));
     handle->queries[handle->numQueries] = query;
     handle->numQueries++;
 
-    xQueueSend(handle->mdnsQueue, (void *)mdnsTaskActionQuery, portMAX_DELAY);
+    LOG(DEBUG, "mdns: adding query: %s", query->service);
+    
+    mdnsTaskAction action = mdnsTaskActionQuery;
+    xQueueSendToBack(handle->mdnsQueue, &action, portMAX_DELAY);
 }
 
 void mdns_remove_query(mdnsHandle *handle, mdnsQueryHandle *query) {
     // TODO: mutex lock handle->queries
     for(uint8_t i = 0; i < handle->numQueries; i++) {
         if (handle->queries[i] == query) {
+            LOG(DEBUG, "mdns: removing query: %s", query->service);
             for (uint8_t j = i + 1; j < handle->numQueries - 1; j++) {
                 handle->queries[i] = handle->queries[j];
             }
@@ -94,6 +118,8 @@ void mdns_remove_query(mdnsHandle *handle, mdnsQueryHandle *query) {
 //
 
 mdnsHandle *mdns_create(char *hostname) {
+    LOG(DEBUG, "mdns: creating MDNS service for %s", hostname);
+    
     mdnsHandle *handle = malloc(sizeof(mdnsHandle));
     memset(handle, 0, sizeof(mdnsHandle));
 
@@ -107,35 +133,56 @@ mdnsHandle *mdns_create(char *hostname) {
     
     handle->started = false;
     
-    handle->mdnsQueue = xQueueCreate(1, sizeof(mdnsTaskAction));
+    handle->mdnsQueue = xQueueCreate(1, sizeof(int));
+    return handle;
 }
 
 // Start broadcasting MDNS records
 void mdns_start(mdnsHandle *handle) {
-    xTaskCreate(mdns_server_task, "mdns", 100, handle, 3, &handle->mdnsTask);
-    xQueueSendToBack(handle->mdnsQueue, (void *)mdnsTaskActionStart, portMAX_DELAY);
+    LOG(DEBUG, "mdns: Starting service");
+
+    if (xTaskCreate(mdns_server_task, "mdns", 1000, handle, 3, &handle->mdnsTask) != pdPASS) {
+        LOG(ERROR, "mdns: Could not create service, terminating");
+        mdns_destroy(handle);
+    }
+    LOG(TRACE, "mdns: signaling start");
+    mdnsTaskAction action = mdnsTaskActionStart;
+    xQueueSendToBack(handle->mdnsQueue, &action, portMAX_DELAY);
+    LOG(TRACE, "mdns: Service started");    
 }
 
 // Stop broadcasting MDNS records
 void mdns_stop(mdnsHandle *handle) {
-    xQueueSendToBack(handle->mdnsQueue, (void *)mdnsTaskActionStop, portMAX_DELAY);
+    LOG(DEBUG, "mdns: Stopping service");
+
+    mdnsTaskAction action = mdnsTaskActionStop;
+    xQueueSendToBack(handle->mdnsQueue, &action, portMAX_DELAY);
 
     // wait for mdns service to stop
-    mdnsTaskAction action = mdnsTaskActionNone;
+    action = mdnsTaskActionNone;
     mdnsTaskAction *ptr = &action;
     while (action != mdnsTaskActionDestroy) {
         taskYIELD();
         xQueuePeek(handle->mdnsQueue, ptr, portMAX_DELAY);
     }
+    // FIXME: clear queue
+    LOG(TRACE, "mdns: Service stopped");    
 }
 
 // Restart MDNS service (call on IP/Network change)
 void mdns_restart(mdnsHandle *handle) {
-    xQueueSendToBack(handle->mdnsQueue, (void *)mdnsTaskActionRestart, portMAX_DELAY);
+    LOG(DEBUG, "mdns: Restarting service");
+
+    mdnsTaskAction action = mdnsTaskActionRestart;
+    xQueueSendToBack(handle->mdnsQueue, &action, portMAX_DELAY);
+
+    LOG(TRACE, "mdns: Service restarted");
 }
 
 // Update IP
 void mdns_update_ip(mdnsHandle *handle, struct ip_addr ip) {
+    LOG(DEBUG, "mdns: Updating IP to %d.%d.%d.%d", (ip.addr & 0xff), ((ip.addr >> 8) & 0xff), ((ip.addr >> 16) & 0xff), ((ip.addr >> 24) & 0xff));
+
     if (memcmp(&handle->ip, &ip, sizeof(struct ip_addr)) != 0) {
         bool restart = handle->started;
         if (restart) {
@@ -150,6 +197,8 @@ void mdns_update_ip(mdnsHandle *handle, struct ip_addr ip) {
 
 // Destroy MDNS handle
 void mdns_destroy(mdnsHandle *handle) {
+    LOG(DEBUG, "mdns: Destroying service handle");
+
     // shut down task
     if (handle->mdnsTask) {
         mdns_stop(handle);

@@ -38,7 +38,7 @@ void mdns_parse_packet(mdnsHandle *handle, mdnsStreamBuf *buffer, ip_addr_t *ip,
 #if defined(MDNS_ENABLE_PUBLISH) && MDNS_ENABLE_PUBLISH
         // we have to listen to queries all the time as a host may have missed our
         // announce packet.
-        mdns_parse_query(buffer, numQuestions);
+        mdns_parse_query(handle, buffer, numQuestions, transactionID);
 #endif /* MDNS_ENABLE_PUBLISH */
     }
 }

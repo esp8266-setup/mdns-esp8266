@@ -6,6 +6,8 @@
 #if MDNS_ENABLE_QUERY
 
 mdnsQueryHandle *mdns_query(mdnsHandle *handle, char *service, mdnsProtocol protocol, mdnsQueryCallback *callback) {
+    LOG(TRACE, "mdns: Creating query %s", service);
+
     mdnsQueryHandle *qHandle = malloc(sizeof(mdnsQueryHandle));
     
     // copy over service name
@@ -22,6 +24,8 @@ mdnsQueryHandle *mdns_query(mdnsHandle *handle, char *service, mdnsProtocol prot
 }
 
 void mdns_query_destroy(mdnsHandle *handle, mdnsQueryHandle *query) {
+    LOG(TRACE, "mdns: Destroying query %s", query->service);
+
     mdns_remove_query(handle, query);
 
     free(query->service);

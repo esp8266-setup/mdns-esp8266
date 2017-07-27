@@ -1,87 +1,53 @@
+#include <stdlib.h>
+#include <strings.h>
+
+#include <mdns/mdns.h>
+#include "mdns_publish.h"
+
+#include "mdns_network.h"
+#include "server.h"
+#include "tools.h" // deceprated
+#include "dns.h"
+
+#include "debug.h"
+
 //
 // PUBLISH
 //
 
 #if MDNS_ENABLE_PUBLISH
 
-static uint16_t mdns_calculate_size(mdnsHandle *handle, mdnsRecordType query) {
+static uint16_t mdns_calculate_size(mdnsHandle *handle, mdnsRecordType query, mdnsService *serviceOrNull) {
     uint8_t hostnameLen = strlen(handle->hostname);
     uint16_t size = 12; // header
 
-    // FQDN
-    uint8_t fqdnLen = hostnameLen + 1 /* size prefix */ + 7 /* size prefix + '.local' + 0x00 */;
-
     switch (query) {
         case mdnsRecordTypePTR:
-            size += fqdnLen;
-            size += 2 /* type code */ + 2 /* class code */ + 2 /* ttl */ + 2 /* data len */;
-            size += hostnameLen;
-
-            fqdnLen = 2;
+            size += mdns_sizeof_PTR(handle->hostname, serviceOrNull);
             // fallthrough
         case mdnsRecordTypeSRV:
-            for (uint8_t i = 0; i < handle->numServices; i++) {
-                uint8_t serviceNameLen = strlen(handle->services[i]->name) + 1 /* . */ + hostnameLen;
-                size += fqdnLen;
-                size += 2 /* type code */ + 2 /* class code */ + 2 /* ttl */ + 2 /* data len */;
-                size += 2 /* priority */ + 2 /* weight */ + 2 /* port */ + serviceNameLen;
-
-                fqdnLen = 2;
-            }
+            size += mdns_sizeof_SRV(handle->hostname, handle->services, handle->numServices, serviceOrNull);
             // fallthrough
         case mdnsRecordTypeTXT:
-            for (uint8_t i = 0; i < handle->numServices; i++) {
-                mdnsService *service = handle->services[i];
-
-                uint8_t serviceNameLen = strlen(service->name) + 5 /* '._tcp' or '._udp' */ + 1 /* . */ + hostnameLen;
-                size += serviceNameLen;
-                size += 2 /* type code */ + 2 /* class code */ + 2 /* ttl */ + 2 /* data len */;
-
-                for(uint8_t j = 0; j < service->numTxtRecords; j++) {
-                    size += 1 /* len of txt record k/v pair */;
-                    size += strlen(service->txtRecords[j].name) + 1 /* = */;
-                    size += strlen(service->txtRecords[j].value);
-                }
-            }
-            if (query != mdnsRecordTypeTXT) {
-                fqdnLen = 2;
-            }
+            size += mdns_sizeof_TXT(handle->hostname, handle->services, handle->numServices, serviceOrNull);
             break;
     }
 
     // always append an A record
-    size += fqdnLen;
-    size += 2 /* type code */ + 2 /* class code */ + 2 /* ttl */ + 2 /* data len */;
-    size += 4 /* ip address */;
+    size += mdns_sizeof_A(handle->hostname);
+
+    LOG(TRACE, "mdns: Calculated packet size: %d", size);
+    return size;
 }
 
-static inline char *record_header(char *buffer, bool first, mdnsRecordType type, uint16_t ttl, uint16_t len) {
-    if (!first) {
-        // compressed fqdn pointer
-        *buffer++ = 0xc0;
-        *buffer++ = 0x0c;
-    }
-    // type
-    *buffer++ = 0;
-    *buffer++ = type;
-    // class
-    *buffer++ = 0x80; // cache buster flag
-    *buffer++ = 0x01; // class: internet
-    // ttl
-    *buffer++ = ttl >> 8;
-    *buffer++ = ttl & 0xff;
-    // data length
-    *buffer++ = len >> 8;
-    *buffer++ = len & 0xff;
-
-    return buffer;
-}
-
-static char *mdns_prepare_response(mdnsHandle *handle, mdnsRecordType query, uint16_t ttl, uint16_t transactionID, uint16_t *len) {
-    *len = mdns_calculate_size(handle, query);
-    char *buffer = malloc(*len);
+static char *mdns_prepare_response(mdnsHandle *handle, mdnsRecordType query, uint16_t ttl, uint16_t transactionID, uint16_t *len, mdnsService *serviceOrNull) {
+    LOG(TRACE, "mdns: preparing response");
+    uint8_t hostnameLen = strlen(handle->hostname);
+    uint16_t size = mdns_calculate_size(handle, query, serviceOrNull);
+    char *buffer = malloc(size);
     char *ptr = buffer;
-    memset(buffer, 0, *len);
+    memset(buffer, 0, size);
+    *len = size;
 
     // transaction ID
     *ptr++ = transactionID >> 8;
@@ -107,6 +73,7 @@ static char *mdns_prepare_response(mdnsHandle *handle, mdnsRecordType query, uin
     *ptr++ = 0;  *ptr++ = 0;
 
     // num Additional RRs
+    // FIXME: update number of records afterwards, not here
     uint8_t numRRs = 0;
     switch (query) {
         case mdnsRecordTypePTR:
@@ -122,128 +89,33 @@ static char *mdns_prepare_response(mdnsHandle *handle, mdnsRecordType query, uin
     *ptr++ = 0;
     *ptr++ = numRRs;
 
-    // fqdn
-    uint8_t hostnameLen = strlen(handle->hostname);
-    *ptr++ = hostnameLen; // size prefix
-    memcpy(ptr, handle->hostname, hostnameLen); // hostname
-    ptr += hostnameLen;
-    *ptr++ = 5; // strlen('local')
-    memcpy(ptr, "local", 5); // local part
-    ptr += 5;
-    *ptr++ = 0; // terminator
-
-    bool first = true;
+    char *fqdn = NULL;
 
     // records
     switch (query) {
         case mdnsRecordTypePTR:
-            ptr = record_header(ptr, first, mdnsRecordTypePTR, ttl, hostnameLen);
-
-            // packet data
-            memcpy(ptr, handle->hostname, hostnameLen);
-            ptr += hostnameLen;
-
-            first = false;
+            ptr = mdns_make_PTR(ptr, ttl, handle->hostname, serviceOrNull);
             // fallthrough
         case mdnsRecordTypeSRV:
-            for (uint8_t i = 0; i < handle->numServices; i++) {
-                mdnsService *service = handle->services[i];
-                uint8_t serviceNameLen = strlen(service->name);
-                ptr = record_header(ptr, first, mdnsRecordTypeSRV, ttl, 6 + serviceNameLen + 1 /* . */ + hostnameLen);
-                
-                // prio
-                *ptr++ = 0;
-                *ptr++ = 0;
-
-                // weight
-                *ptr++ = 0;
-                *ptr++ = 0;
-
-                // port
-                *ptr++ = service->port >> 8;
-                *ptr++ = service->port & 0xff; 
-
-                // service name
-                memcpy(ptr, service->name, serviceNameLen);
-                ptr += serviceNameLen;
-                *ptr++ = '.';
-                memcpy(ptr, handle->hostname, hostnameLen);
-                ptr += hostnameLen;
-
-                first = false;
-            }
+            ptr = mdns_make_SRV(ptr, ttl, handle->hostname, handle->services, handle->numServices, serviceOrNull);
             // fallthrough
         case mdnsRecordTypeTXT:
-            for (uint8_t i = 0; i < handle->numServices; i++) {
-                mdnsService *service = handle->services[i];
-                uint8_t serviceNameLen = strlen(service->name);
-
-                uint8_t txtLen = 0;
-                for(uint8_t j = 0; j < service->numTxtRecords; j++) {
-                    txtLen += 1 /* len of txt record k/v pair */;
-                    txtLen += strlen(service->txtRecords[j].name) + 1 /* = */;
-                    txtLen += strlen(service->txtRecords[j].value);
-                }
-                if (txtLen == 0) {
-                    txtLen = 1; // NULL byte sentinel at least
-                }
-
-                // service name
-                memcpy(ptr, service->name, serviceNameLen);
-                ptr += serviceNameLen;
-                *ptr++ = '.';
-                // protocol
-                if (service->protocol == mdnsProtocolTCP) {
-                    memcpy(ptr, "_tcp", 4);
-                } else {
-                    memcpy(ptr, "_udp", 4);
-                }
-                ptr += 4;
-                *ptr++ = '.';
-
-                // hostname
-                memcpy(ptr, handle->hostname, hostnameLen);
-                ptr += hostnameLen;
-
-                ptr = record_header(
-                    ptr, true /* we have a fqdn here, no compressed pointer please */, mdnsRecordTypeTXT, ttl,
-                    serviceNameLen + 1 /* . */ + hostnameLen + txtLen
-                );
-
-                for(uint8_t j = 0; j < service->numTxtRecords; j++) {
-                    uint8_t namLen = strlen(service->txtRecords[j].name);
-                    uint8_t valLen = strlen(service->txtRecords[j].value);
-                    *ptr++ = namLen + 1 + valLen;
-                    memcpy(ptr, service->txtRecords[j].name, namLen);
-                    ptr += namLen;
-                    *ptr++ = '=';
-                    memcpy(ptr, service->txtRecords[j].value, valLen);
-                    ptr += valLen;                    
-                }
-
-                if (txtLen == 0) {
-                    *ptr++ = 0; // empty txt record
-                }
-            }
-            if (query != mdnsRecordTypeTXT) {
-                first = false;
-            }
+            ptr = mdns_make_TXT(ptr, ttl, handle->hostname, handle->services, handle->numServices, serviceOrNull);
             break;
     }
 
     // always append an A record
-    ptr = record_header(ptr, first, mdnsRecordTypeA, ttl, 4);
-    memcpy(ptr, &handle->ip, 4);
-    ptr += 4;
-
-    LOG(TRACE, "Calculated len: %d, built len: %d", *len, ptr - buffer);
-
+    ptr = mdns_make_A(ptr, ttl, handle->hostname, handle->ip);
     return buffer;
 }
 
-static void send_mdns_response_packet(mdnsHandle *handle, uint16_t ttl, uint16_t transactionID) {
+static void send_mdns_response_packet(mdnsHandle *handle, uint16_t ttl, uint16_t transactionID, mdnsService *serviceOrNull) {
+    LOG(TRACE, "mdns: Response packet: ttl = %d, transactionID = %d", ttl, transactionID);
+
     uint16_t responseLen = 0;
-    char *response = mdns_prepare_response(handle, mdnsRecordTypePTR, ttl, transactionID, &responseLen);
+    char *response = mdns_prepare_response(handle, mdnsRecordTypeA, ttl, transactionID, &responseLen, serviceOrNull);
+
+    LOG(TRACE, "mdns: sending udp packet");
     mdns_send_udp_packet(handle, response, responseLen);
 }
 
@@ -251,72 +123,129 @@ static void send_mdns_response_packet(mdnsHandle *handle, uint16_t ttl, uint16_t
 // API
 //
 
-void mdns_parse_query(mdnsStreamBuf *buffer, uint16_t numQueries) {
 #if !MDNS_BROADCAST_ONLY
+void mdns_parse_query(mdnsHandle *handle, mdnsStreamBuf *buffer, uint16_t numQueries, uint16_t transactionID) {
     // we have to react to:
     // - domain name queries
-    // - service discovery queries to one of our registered service
+    // - service discovery queries to one of our registered service types
+    // - service discovery queries with our service name and type
     // - browsing queries: _services._dns-sd._udp
 
-    // TODO: parse query
+    LOG(TRACE, "mdns: parsing %d queries", numQueries);
 
-    // uint16_t currentType;
-    // uint16_t currentClass;
+    char *serviceName[4];
 
-    // int numQuestions = packetHeader[2];
-    // if(numQuestions > 4) numQuestions = 4;
-    // uint16_t questions[4];
-    // int question = 0;
+    while (numQueries--) {
+        // Read FQDN
+        uint8_t stringsRead = 0;
+        do {
+            uint8_t len = mdns_stream_read8(buffer);
+            if (len & 0xC0) { // Compressed pointer (not supported)
+                (void)mdns_stream_read8(buffer);
+                break;
+            }
+            if (len == 0x00) { // End of name
+                break;
+            }
+            if (stringsRead > 4) {
+                return;
+            }
+            serviceName[stringsRead] = mdns_stream_read_string(buffer, len);
+            stringsRead++;
+        } while (true);
 
-    // while(numQuestions--){
-    //     currentType = _conn_read16();
-    //     if(currentType & MDNS_NAME_REF){ //new header handle it better!
-    //         currentType = _conn_read16();
-    //     }
-    //     currentClass = _conn_read16();
-    //     if(currentClass & MDNS_CLASS_IN)
-    //         questions[question++] = currentType;
 
-    //     if(numQuestions > 0){
-    //         if(_conn_read16() != 0xC00C){//new question but for another host/service
-    //             _conn->flush();
-    //             numQuestions = 0;
-    //         }
-    //     }
-    // }
+        mdnsRecordType queryType = mdns_stream_read16(buffer);
+        uint16_t queryClass = mdns_stream_read16(buffer);
 
-    // uint8_t questionMask = 0;
-    // uint8_t responseMask = 0;
-    // for(i=0;i<question;i++){
-    //     if(questions[i] == MDNS_TYPE_A) {
-    //         questionMask |= 0x1;
-    //         responseMask |= 0x1;
-    //     } else if(questions[i] == MDNS_TYPE_SRV) {
-    //         questionMask |= 0x2;
-    //         responseMask |= 0x3;
-    //     } else if(questions[i] == MDNS_TYPE_TXT) {
-    //         questionMask |= 0x4;
-    //         responseMask |= 0x4;
-    //     } else if(questions[i] == MDNS_TYPE_PTR) {
-    //         questionMask |= 0x8;
-    //         responseMask |= 0xF;
-    //     }
-    // }
+        if (queryClass & 0x80) {
+            // should be sent via unicast, not supported
+            return;
+        }
 
-    // IPAddress interface = _getRequestMulticastInterface();
-    // return _replyToInstanceRequest(questionMask, responseMask, serviceName, protoName, servicePort, interface);
+        switch(queryType) {
+            case mdnsRecordTypePTR: {
+                // PTR records are for searching for services
+                for (uint8_t i = 0; i < handle->numServices; i++) {
+                    mdnsService *service = handle->services[i];
+                    char *proto = (service->protocol == mdnsProtocolTCP) ? "_tcp" : "_udp";
+                    if ((strcasecmp(serviceName[0], service->name) == 0) && (strcasecmp(serviceName[1], proto) == 0)) {
+                        LOG(TRACE, "mdns: responding to PTR query");
+                        uint16_t responseLen = 0;
+                        char *response = mdns_prepare_response(handle, mdnsRecordTypePTR, MDNS_MULTICAST_TTL, transactionID, &responseLen, service);
+                        mdns_send_udp_packet(handle, response, responseLen);
+                        break;
+                    }
+                }
+                break;
+            }
 
+            case mdnsRecordTypeA: {
+                // A records want to find an IP address for a hostname
+                if (strcasecmp(serviceName[0], handle->hostname) == 0) {
+                    LOG(TRACE, "mdns: responding to A query");
+                    uint16_t responseLen = 0;
+                    char *response = mdns_prepare_response(handle, mdnsRecordTypeA, MDNS_MULTICAST_TTL, transactionID, &responseLen, NULL);
+                    mdns_send_udp_packet(handle, response, responseLen);
+                    break;                    
+                }
+            }
+
+            case mdnsRecordTypeSRV:
+            case mdnsRecordTypeTXT: {
+                // TXT record, only answer if the complete service name is correct
+                if (strcasecmp(serviceName[0], handle->hostname) == 0) {
+                    for (uint8_t i = 0; i < handle->numServices; i++) {
+                        mdnsService *service = handle->services[i];
+                        char *proto = (service->protocol == mdnsProtocolTCP) ? "_tcp" : "_udp";
+                        if ((strcasecmp(serviceName[1], service->name) == 0) && (strcasecmp(serviceName[2], proto) == 0)) {
+                            LOG(TRACE, "mdns: responding to SRV or TXT query");
+                            uint16_t responseLen = 0;
+                            char *response = mdns_prepare_response(handle, mdnsRecordTypeTXT, MDNS_MULTICAST_TTL, transactionID, &responseLen, service);
+                            mdns_send_udp_packet(handle, response, responseLen);
+                            break;
+                        }
+                    }
+                }
+                break;
+            }
+
+            case mdnsRecordTypeAny: {
+                // This requests just everything about a host, officially deceprated but I can see it on the network
+                if (strcasecmp(serviceName[0], handle->hostname) == 0) {
+                    LOG(TRACE, "mdns: responding to ANY query");
+    
+                    // this is a cascade, we will send multiple packets to avoid
+                    // overloading the mtu
+                    for (uint8_t i = 0; i < handle->numServices; i++) {
+                        mdnsService *service = handle->services[i];
+                        uint16_t responseLen = 0;
+                        char *response = mdns_prepare_response(handle, mdnsRecordTypePTR, MDNS_MULTICAST_TTL, transactionID, &responseLen, service);
+                        mdns_send_udp_packet(handle, response, responseLen);                        
+                    }
+                    break;                    
+                }
+            }
+
+            case mdnsRecordTypeAAAA:
+            default:
+                break;
+        }
+
+    }
 }
 #endif /* !MDNS_BROADCAST_ONLY */
 
 void mdns_announce(mdnsHandle *handle) {
+    LOG(DEBUG, "mdns: Announcing");
     // respond with our data, setting most significant bit in RRClass to update caches
-    send_mdns_response_packet(handle, MDNS_MULTICAST_TTL, 0);
+    send_mdns_response_packet(handle, MDNS_MULTICAST_TTL, 0, NULL);
 }
 
 void mdns_goodbye(mdnsHandle *handle) {
+    LOG(DEBUG, "mdns: Goodbye");
     // send announce packet with TTL of zero
-    send_mdns_response_packet(handle, 0, 0);
+    send_mdns_response_packet(handle, 0, 0, NULL);
 }
 
 #endif /* MDNS_ENABLE_PUBLISH */

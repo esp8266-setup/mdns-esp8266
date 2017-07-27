@@ -7,7 +7,7 @@
 
 // Enable query API (Disabled by default)
 #ifndef MDNS_ENABLE_QUERY
-#define MDNS_ENABLE_QUERY 1
+#define MDNS_ENABLE_QUERY 0
 #endif
 
 // Enable publishing API
