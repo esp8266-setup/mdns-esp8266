@@ -33,12 +33,11 @@ static uint16_t mdns_calculate_size(mdnsHandle *handle, mdnsRecordType query, md
             break;
     }
 
-    LOG(TRACE, "mdns: Calculated packet size: %d", size);
+    // LOG(TRACE, "mdns: Calculated packet size: %d", size);
     return size;
 }
 
 static char *mdns_prepare_response(mdnsHandle *handle, mdnsRecordType query, uint16_t ttl, uint16_t transactionID, uint16_t *len, mdnsService *serviceOrNull) {
-    LOG(TRACE, "mdns: preparing response");
     uint8_t hostnameLen = strlen(handle->hostname);
     uint16_t size = mdns_calculate_size(handle, query, serviceOrNull);
     char *buffer = calloc(size, 1);
@@ -108,13 +107,10 @@ static char *mdns_prepare_response(mdnsHandle *handle, mdnsRecordType query, uin
 }
 
 static void send_mdns_response_packet(mdnsHandle *handle, uint16_t ttl, uint16_t transactionID, mdnsService *serviceOrNull) {
-    LOG(TRACE, "mdns: Response packet: ttl = %d, transactionID = %d", ttl, transactionID);
-
     uint16_t responseLen = 0;
     char *response;
 
     response = mdns_prepare_response(handle, mdnsRecordTypePTR, ttl, transactionID, &responseLen, serviceOrNull);
-    LOG(TRACE, "mdns: sending udp packet");
     mdns_send_udp_packet(handle, response, responseLen);
 }
 

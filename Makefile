@@ -30,7 +30,7 @@ endif # } PDIR
 
 LDDIR = $(SDK_PATH)/ld
 
-CCFLAGS += -Os
+CCFLAGS += -Os -DMDNS_BROADCAST_ONLY=1 -DDEBUG_LEVEL=ERROR
 
 TARGET_LDFLAGS =		\
 	-nostdlib		\

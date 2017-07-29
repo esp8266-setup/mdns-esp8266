@@ -14,14 +14,19 @@ void mdns_server_task(void *userData) {
     LOG(TRACE, "mdns: Service task started");    
 
     while (1) {
-        LOG(TRACE, "mdns: task waiting");
+#if MDNS_BROADCAST_ONLY
+        // wait a maximum of 30 seconds then re-announce
+        if (xQueueReceive(handle->mdnsQueue, &tmp, 3000) == pdFALSE) {
+            tmp = mdnsTaskActionRestart; // if nothing happens for about 30 seconds, re-announce
+        }
+#else
+        // wait until we should do something
         xQueueReceive(handle->mdnsQueue, &tmp, portMAX_DELAY);
+#endif
         action = (mdnsTaskAction)tmp;
 
         // destroy messages are for the caller, not for us
-        if (action == mdnsTaskActionDestroy) {
-            LOG(TRACE, "mdns: task reinserting destroy message");
-    
+        if (action == mdnsTaskActionDestroy) {    
             // re-insert into queue
             xQueueSendToBack(handle->mdnsQueue, &action, portMAX_DELAY);
 
@@ -30,8 +35,6 @@ void mdns_server_task(void *userData) {
 
             continue;
         }
-
-        LOG(TRACE, "mdns: task signaled %d", action);
 
         switch (action) {
             case mdnsTaskActionStart:
@@ -144,7 +147,6 @@ void mdns_start(mdnsHandle *handle) {
         LOG(ERROR, "mdns: Could not create service, terminating");
         mdns_destroy(handle);
     }
-    LOG(TRACE, "mdns: signaling start");
     mdnsTaskAction action = mdnsTaskActionStart;
     xQueueSendToBack(handle->mdnsQueue, &action, portMAX_DELAY);
     LOG(TRACE, "mdns: Service started");    

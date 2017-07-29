@@ -8,8 +8,6 @@
 
 
 mdnsService *mdns_create_service(char *name, mdnsProtocol protocol, uint16_t port) {
-    LOG(TRACE, "mdns: Creating service %s", name);
-
     mdnsService *service = calloc(1, sizeof(mdnsService));
     service->name = strdup(name);
     service->protocol = protocol;
@@ -19,8 +17,6 @@ mdnsService *mdns_create_service(char *name, mdnsProtocol protocol, uint16_t por
 }
 
 void mdns_service_add_txt(mdnsService *service, char *key, char *value) {
-    LOG(TRACE, "mdns: Adding txt record to service %s: %s -> %s", service->name, key, value);
-
     service->txtRecords = realloc(service->txtRecords, sizeof(mdnsTxtRecord) * (service->numTxtRecords + 1));
     
     service->txtRecords[service->numTxtRecords].name = strdup(key);
@@ -29,8 +25,6 @@ void mdns_service_add_txt(mdnsService *service, char *key, char *value) {
 }
 
 void mdns_service_destroy(mdnsService *service) {
-    LOG(TRACE, "mdns: Destroying service %s", service->name);
-
     for (uint8_t i = 0; i < service->numTxtRecords; i++) {
         free(service->txtRecords[i].name);
         free(service->txtRecords[i].value);
@@ -44,8 +38,6 @@ void mdns_service_destroy(mdnsService *service) {
 #if MDNS_ENABLE_PUBLISH
 
 void mdns_add_service(mdnsHandle *handle, mdnsService *service) {
-    LOG(TRACE, "mdns: Adding service %s", service->name);
-
     if (handle->services) {
         handle->services = realloc(handle->services, sizeof(mdnsService *) * (handle->numServices + 1));
     } else {
@@ -55,14 +47,11 @@ void mdns_add_service(mdnsHandle *handle, mdnsService *service) {
     handle->numServices++;
 
     if (handle->started) {
-        LOG(TRACE, "mdns: restarting service");
         xQueueSend(handle->mdnsQueue, (void *)mdnsTaskActionRestart, portMAX_DELAY);
     }
 }
 
 void mdns_remove_service(mdnsHandle *handle, mdnsService *service) {
-    LOG(TRACE, "mdns: Removing service %s", service->name);
-
     for(uint8_t i = 0; i < handle->numServices; i++) {
         if (handle->services[i] == service) {
             for (uint8_t j = i + 1; j < handle->numServices - 1; j++) {
@@ -74,7 +63,6 @@ void mdns_remove_service(mdnsHandle *handle, mdnsService *service) {
     handle->numServices--;
 
     if (handle->started) {
-        LOG(TRACE, "mdns: restarting service");
         xQueueSend(handle->mdnsQueue, (void *)mdnsTaskActionRestart, portMAX_DELAY);    
     }
 }

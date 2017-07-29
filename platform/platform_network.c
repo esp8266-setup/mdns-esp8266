@@ -12,6 +12,7 @@
 // private
 //
 
+#if !MDNS_BROADCAST_ONLY
 void mdns_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *buf, ip_addr_t *ip, uint16_t port) {
     mdnsHandle *handle = (mdnsHandle *)arg;
 
@@ -26,6 +27,7 @@ void mdns_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *buf, ip_add
     // clean up our stream reader
     mdns_stream_destroy(buffer);
 }
+#endif /* MDNS_BROADCAST_ONLY */
 
 //
 // API
@@ -75,12 +77,15 @@ mdnsUDPHandle *mdns_listen(mdnsHandle *handle) {
         return NULL;
     }
 
+#if !MDNS_BROADCAST_ONLY
     LOG(TRACE, "mdns: setting up receive callback");
     udp_recv(pcb, mdns_recv_callback, (void *)handle);
+#endif /* MDNS_BROADCAST_ONLY */
 
     LOG(TRACE, "mdns: connecting");
     udp_connect(pcb, &multicast_addr, MDNS_PORT);
     return pcb;
+
 }
 
 uint16_t mdns_send_udp_packet(mdnsHandle *handle, char *data, uint16_t len) {
@@ -89,8 +94,8 @@ uint16_t mdns_send_udp_packet(mdnsHandle *handle, char *data, uint16_t len) {
         LOG(ERROR, "mdns: pbuf not big enough");
     }
 
-    HEXDUMP(DEBUG, "mdns: UDP Packet", data, len);
-    LOG(TRACE, "mdns: sending packet (%d bytes)", len);
+    // HEXDUMP(DEBUG, "mdns: UDP Packet", data, len);
+    // LOG(TRACE, "mdns: sending packet (%d bytes)", len);
 
     // actually send it
     udp_send(handle->pcb, buf);
