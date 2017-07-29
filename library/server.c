@@ -120,8 +120,7 @@ void mdns_remove_query(mdnsHandle *handle, mdnsQueryHandle *query) {
 mdnsHandle *mdns_create(char *hostname) {
     LOG(DEBUG, "mdns: creating MDNS service for %s", hostname);
     
-    mdnsHandle *handle = malloc(sizeof(mdnsHandle));
-    memset(handle, 0, sizeof(mdnsHandle));
+    mdnsHandle *handle = calloc(1, sizeof(mdnsHandle));
 
     // duplicate hostname and convert to lowercase
     uint8_t hostnameLen = strlen(hostname);
@@ -141,7 +140,7 @@ mdnsHandle *mdns_create(char *hostname) {
 void mdns_start(mdnsHandle *handle) {
     LOG(DEBUG, "mdns: Starting service");
 
-    if (xTaskCreate(mdns_server_task, "mdns", 1000, handle, 3, &handle->mdnsTask) != pdPASS) {
+    if (xTaskCreate(mdns_server_task, "mdns", 250, handle, 3, &handle->mdnsTask) != pdPASS) {
         LOG(ERROR, "mdns: Could not create service, terminating");
         mdns_destroy(handle);
     }

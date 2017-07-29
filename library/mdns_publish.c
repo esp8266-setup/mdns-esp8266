@@ -23,18 +23,15 @@ static uint16_t mdns_calculate_size(mdnsHandle *handle, mdnsRecordType query, md
 
     switch (query) {
         case mdnsRecordTypePTR:
-            size += mdns_sizeof_PTR(handle->hostname, serviceOrNull);
-            // fallthrough
+            size += mdns_sizeof_PTR(handle->hostname, handle->services, handle->numServices, serviceOrNull);
         case mdnsRecordTypeSRV:
             size += mdns_sizeof_SRV(handle->hostname, handle->services, handle->numServices, serviceOrNull);
-            // fallthrough
         case mdnsRecordTypeTXT:
             size += mdns_sizeof_TXT(handle->hostname, handle->services, handle->numServices, serviceOrNull);
+        case mdnsRecordTypeA:
+            size += mdns_sizeof_A(handle->hostname);
             break;
     }
-
-    // always append an A record
-    size += mdns_sizeof_A(handle->hostname);
 
     LOG(TRACE, "mdns: Calculated packet size: %d", size);
     return size;
@@ -44,9 +41,8 @@ static char *mdns_prepare_response(mdnsHandle *handle, mdnsRecordType query, uin
     LOG(TRACE, "mdns: preparing response");
     uint8_t hostnameLen = strlen(handle->hostname);
     uint16_t size = mdns_calculate_size(handle, query, serviceOrNull);
-    char *buffer = malloc(size);
+    char *buffer = calloc(size, 1);
     char *ptr = buffer;
-    memset(buffer, 0, size);
     *len = size;
 
     // transaction ID
@@ -77,35 +73,37 @@ static char *mdns_prepare_response(mdnsHandle *handle, mdnsRecordType query, uin
     uint8_t numRRs = 0;
     switch (query) {
         case mdnsRecordTypePTR:
-            numRRs++;
-            // fallthrough
+            numRRs += handle->numServices;
         case mdnsRecordTypeSRV:
             numRRs += handle->numServices;
-            // fallthrough
         case mdnsRecordTypeTXT:
-            numRRs += handle->numServices; // one per service
+            for (uint8_t i = 0; i < handle->numServices; i++) {
+                if (handle->services[i]->numTxtRecords > 0) {
+                    numRRs ++; // one per service
+                }
+            }
+        case mdnsRecordTypeA:
+            numRRs++;
             break;
     }
     *ptr++ = 0;
-    *ptr++ = numRRs;
+    *ptr++ = numRRs - 1; // One is already in the answer, the others are additional RRs
 
     char *fqdn = NULL;
 
     // records
     switch (query) {
         case mdnsRecordTypePTR:
-            ptr = mdns_make_PTR(ptr, ttl, handle->hostname, serviceOrNull);
-            // fallthrough
+            ptr = mdns_make_PTR(ptr, ttl, handle->hostname, handle->services, handle->numServices, serviceOrNull);
         case mdnsRecordTypeSRV:
             ptr = mdns_make_SRV(ptr, ttl, handle->hostname, handle->services, handle->numServices, serviceOrNull);
-            // fallthrough
         case mdnsRecordTypeTXT:
             ptr = mdns_make_TXT(ptr, ttl, handle->hostname, handle->services, handle->numServices, serviceOrNull);
+        case mdnsRecordTypeA:
+            ptr = mdns_make_A(ptr, ttl, handle->hostname, handle->ip);
             break;
     }
 
-    // always append an A record
-    ptr = mdns_make_A(ptr, ttl, handle->hostname, handle->ip);
     return buffer;
 }
 
@@ -113,8 +111,9 @@ static void send_mdns_response_packet(mdnsHandle *handle, uint16_t ttl, uint16_t
     LOG(TRACE, "mdns: Response packet: ttl = %d, transactionID = %d", ttl, transactionID);
 
     uint16_t responseLen = 0;
-    char *response = mdns_prepare_response(handle, mdnsRecordTypeA, ttl, transactionID, &responseLen, serviceOrNull);
+    char *response;
 
+    response = mdns_prepare_response(handle, mdnsRecordTypePTR, ttl, transactionID, &responseLen, serviceOrNull);
     LOG(TRACE, "mdns: sending udp packet");
     mdns_send_udp_packet(handle, response, responseLen);
 }

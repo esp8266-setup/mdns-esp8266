@@ -49,13 +49,13 @@ typedef enum _mdnsRecordType {
     mdnsRecordTypeAny = 0xff // Officially this is deceprated
 } mdnsRecordType;
 
-uint16_t mdns_sizeof_PTR(char *hostname, mdnsService *service);
+uint16_t mdns_sizeof_PTR(char *hostname, mdnsService **services, uint8_t numServices, mdnsService *serviceOrNull);
 uint16_t mdns_sizeof_SRV(char *hostname, mdnsService **services, uint8_t numServices, mdnsService *serviceOrNull);
 uint16_t mdns_sizeof_TXT(char *hostname, mdnsService **services, uint8_t numServices, mdnsService *serviceOrNull);
 uint16_t mdns_sizeof_A(char *hostname);
 uint16_t mdns_sizeof_AAAA();
 
-char *mdns_make_PTR(char *buffer, uint16_t ttl, char *hostname, mdnsService *service);
+char *mdns_make_PTR(char *buffer, uint16_t ttl, char *hostname, mdnsService **services, uint8_t numServices, mdnsService *serviceOrNull);
 char *mdns_make_SRV(char *buffer, uint16_t ttl, char *hostname, mdnsService **services, uint8_t numServices, mdnsService *serviceOrNull);
 char *mdns_make_TXT(char *buffer, uint16_t ttl, char *hostname, mdnsService **services, uint8_t numServices, mdnsService *serviceOrNull);
 char *mdns_make_A(char *buffer, uint16_t ttl, char *hostname, struct ip_addr ip);

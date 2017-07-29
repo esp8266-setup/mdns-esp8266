@@ -10,32 +10,21 @@
 mdnsService *mdns_create_service(char *name, mdnsProtocol protocol, uint16_t port) {
     LOG(TRACE, "mdns: Creating service %s", name);
 
-    mdnsService *service = malloc(sizeof(mdnsService));
-    memset(service, 0, sizeof(mdnsService));
-
-    uint8_t nameLen = strlen(name);
-    service->name = malloc(nameLen + 1);
-    memcpy(service->name, name, nameLen + 1);
-
+    mdnsService *service = calloc(1, sizeof(mdnsService));
+    service->name = strdup(name);
     service->protocol = protocol;
     service->port = port;
+
+    return service;
 }
 
 void mdns_service_add_txt(mdnsService *service, char *key, char *value) {
     LOG(TRACE, "mdns: Adding txt record to service %s: %s -> %s", service->name, key, value);
 
     service->txtRecords = realloc(service->txtRecords, sizeof(mdnsTxtRecord) * (service->numTxtRecords + 1));
-
-    uint8_t len;
     
-    len = strlen(key);
-    service->txtRecords[service->numTxtRecords].name = malloc(len + 1);
-    memcpy(service->txtRecords[service->numTxtRecords].name, key, len + 1);
-
-    len = strlen(value);
-    service->txtRecords[service->numTxtRecords].value = malloc(len + 1);
-    memcpy(service->txtRecords[service->numTxtRecords].value, value, len + 1);
-
+    service->txtRecords[service->numTxtRecords].name = strdup(key);
+    service->txtRecords[service->numTxtRecords].value = strdup(value);
     service->numTxtRecords++;
 }
 
