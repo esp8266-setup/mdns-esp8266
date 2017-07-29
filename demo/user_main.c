@@ -99,7 +99,8 @@ void user_init(void) {
 }
 
 void startup(void *userData) {
-	mdnsService *service = mdns_create_service("_workstation", mdnsProtocolTCP, 80);
+	mdnsService *service = mdns_create_service("_workstation", mdnsProtocolUDP, 5353);
+    mdns_service_add_txt(service, "bla", "blubb");
 	mdns_add_service(mdns, service);
 
 	mdns_start(mdns);
