@@ -78,16 +78,19 @@ void ICACHE_FLASH_ATTR wifi_event_handler_cb(System_Event_t *event) {
         ip_address_t address4 = { 0 };
         memcpy(&address4, &event->event_info.got_ip.ip, sizeof(ip_address_t));
 
+        // create a link local address
+        netif_create_ip6_linklocal_address(interface, 1);
+        netif_set_up(interface);
+
         while (interface != NULL) {
             for (int i = 0; i < LWIP_IPV6_NUM_ADDRESSES; i++) {
-                if (ip6_addr_ispreferred(netif_ip6_addr_state(interface, i))) {
+                if (ip6_addr_istentative(netif_ip6_addr_state(interface, i))) {
                     memcpy(&address6, netif_ip6_addr(interface, i), sizeof(ip6_address_t));
                     break;
                 }
             }
             interface = interface->next;
         }
-
 
         if (running) {
 			mdns_update_ip(mdns, address4, address6);
