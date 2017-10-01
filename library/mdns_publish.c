@@ -30,6 +30,8 @@ static uint16_t mdns_calculate_size(mdnsHandle *handle, mdnsRecordType query, md
             size += mdns_sizeof_TXT(handle->hostname, handle->services, handle->numServices, serviceOrNull);
         case mdnsRecordTypeA:
             size += mdns_sizeof_A(handle->hostname);
+        case mdnsRecordTypeAAAA:
+            size += mdns_sizeof_AAAA(handle->hostname, handle->ip6);
             break;
     }
 
@@ -83,6 +85,8 @@ static char *mdns_prepare_response(mdnsHandle *handle, mdnsRecordType query, uin
             }
         case mdnsRecordTypeA:
             numRRs++;
+        case mdnsRecordTypeAAAA:
+            numRRs++;
             break;
     }
     *ptr++ = 0;
@@ -100,6 +104,8 @@ static char *mdns_prepare_response(mdnsHandle *handle, mdnsRecordType query, uin
             ptr = mdns_make_TXT(ptr, ttl, handle->hostname, handle->services, handle->numServices, serviceOrNull);
         case mdnsRecordTypeA:
             ptr = mdns_make_A(ptr, ttl, handle->hostname, handle->ip);
+        case mdnsRecordTypeAAAA:
+            ptr = mdns_make_AAAA(ptr, ttl, handle->hostname, handle->ip6);
             break;
     }
 

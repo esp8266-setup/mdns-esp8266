@@ -2,6 +2,7 @@
 #define mdns_dns_h_included
 
 #include <mdns/mdns.h>
+#include <stdbool.h>
 
 typedef enum _mdnsResponseCode {
     responseCodeNoError = 0,
@@ -53,12 +54,12 @@ uint16_t mdns_sizeof_PTR(char *hostname, mdnsService **services, uint8_t numServ
 uint16_t mdns_sizeof_SRV(char *hostname, mdnsService **services, uint8_t numServices, mdnsService *serviceOrNull);
 uint16_t mdns_sizeof_TXT(char *hostname, mdnsService **services, uint8_t numServices, mdnsService *serviceOrNull);
 uint16_t mdns_sizeof_A(char *hostname);
-uint16_t mdns_sizeof_AAAA();
+uint16_t mdns_sizeof_AAAA(char *hostname, ip6_address_t ip);
 
 char *mdns_make_PTR(char *buffer, uint16_t ttl, char *hostname, mdnsService **services, uint8_t numServices, mdnsService *serviceOrNull);
 char *mdns_make_SRV(char *buffer, uint16_t ttl, char *hostname, mdnsService **services, uint8_t numServices, mdnsService *serviceOrNull);
 char *mdns_make_TXT(char *buffer, uint16_t ttl, char *hostname, mdnsService **services, uint8_t numServices, mdnsService *serviceOrNull);
-char *mdns_make_A(char *buffer, uint16_t ttl, char *hostname, struct ip_addr ip);
-char *mdns_make_AAAA();
+char *mdns_make_A(char *buffer, uint16_t ttl, char *hostname, ip_address_t ip);
+char *mdns_make_AAAA(char *buffer, uint16_t ttl, char *hostname, ip6_address_t ip);
 
 #endif /* mdns_dns_h_included */

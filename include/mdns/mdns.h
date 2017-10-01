@@ -26,7 +26,15 @@
 #endif /* MDNS_BROADCAST_ONLY */
 
 #include <stdint.h>
-#include "platform.h"
+
+typedef union ip_address {
+    uint32_t addr;
+    uint8_t addr8[4];
+} ip_address_t;
+
+typedef struct ip6_address {
+  uint32_t addr[4];
+} ip6_address_t;
 
 //
 // MDNS service
@@ -51,7 +59,7 @@ void mdns_restart(mdnsHandle *handle);
 void mdns_destroy(mdnsHandle *handle);
 
 // Set IP address of station, call this in the DHCP callback to update IP
-void mdns_update_ip(mdnsHandle *handle, struct ip_addr ip);
+void mdns_update_ip(mdnsHandle *handle, const ip_address_t ip, const ip6_address_t ip6);
 
 
 //

@@ -26,7 +26,8 @@ struct _mdnsHandle {
     mdnsUDPHandle *pcb;
 
     // IP address handle
-    struct ip_addr ip;
+    ip_address_t ip;
+    ip6_address_t ip6;
     bool started;
 
 #if MDNS_ENABLE_QUERY

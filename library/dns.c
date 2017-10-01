@@ -127,8 +127,22 @@ uint16_t mdns_sizeof_A(char *hostname) {
     return size;
 }
 
-uint16_t mdns_sizeof_AAAA() {
+uint16_t mdns_sizeof_AAAA(char *hostname, ip6_address_t ip) {
+    uint16_t size = 0;
+    ip6_addr_t zero = { 0 };
+    if (memcmp(&zero, &ip, sizeof(ip6_addr_t)) == 0) {
+        return 0;
+    }
 
+    // fqdn
+    char *fqdn = mdns_make_local(hostname);
+    size += sizeof_record_header(fqdn);
+    free(fqdn);
+
+    // ip address
+    size += 16;
+
+    return size;
 }
 
 static char *append_tokenized(char *buffer, char *domain) {
@@ -299,7 +313,7 @@ char *mdns_make_TXT(char *buffer, uint16_t ttl, char *hostname, mdnsService **se
     return ptr;
 }
 
-char *mdns_make_A(char *buffer, uint16_t ttl, char *hostname, struct ip_addr ip) {
+char *mdns_make_A(char *buffer, uint16_t ttl, char *hostname, ip_address_t ip) {
     char *ptr = buffer;
 
     // fqdn
@@ -314,6 +328,23 @@ char *mdns_make_A(char *buffer, uint16_t ttl, char *hostname, struct ip_addr ip)
     return ptr;
 }
 
-char *mdns_make_AAAA() {
+char *mdns_make_AAAA(char *buffer, uint16_t ttl, char *hostname, ip6_address_t ip) {
+    char *ptr = buffer;
 
+    // make sure we actually have an IPv6 address
+    ip6_addr_t zero = { 0 };
+    if (memcmp(&zero, &ip, sizeof(ip6_addr_t)) == 0) {
+        return ptr;
+    }
+
+    // fqdn
+    char *fqdn = mdns_make_local(hostname);
+    ptr = record_header(ptr, fqdn, mdnsRecordTypeAAAA, ttl, 16);
+    free(fqdn);
+
+    // ip address
+    memcpy(ptr, &ip, 16);
+    ptr += 16;
+
+    return ptr;
 }

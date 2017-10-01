@@ -181,15 +181,20 @@ void mdns_restart(mdnsHandle *handle) {
 }
 
 // Update IP
-void mdns_update_ip(mdnsHandle *handle, struct ip_addr ip) {
-    LOG(DEBUG, "mdns: Updating IP to %d.%d.%d.%d", (ip.addr & 0xff), ((ip.addr >> 8) & 0xff), ((ip.addr >> 16) & 0xff), ((ip.addr >> 24) & 0xff));
+void mdns_update_ip(mdnsHandle *handle, const ip_address_t ip, const ip6_address_t ip6) {
+    LOG(DEBUG, "mdns: Updating IPv4 to %d.%d.%d.%d", ip.addr8[0], ip.addr8[1], ip.addr8[2], ip.addr8[3]);
+    LOG(DEBUG, "mdns: Updating IPv6 to %x:%x:%x:%x", ip6.addr[0], ip6.addr[1], ip6.addr[2], ip6.addr[3]);
 
-    if (memcmp(&handle->ip, &ip, sizeof(struct ip_addr)) != 0) {
+
+    if (memcmp(&handle->ip, &ip, sizeof(ip_address_t) != 0) ||
+        memcmp(&handle->ip6, &ip6, sizeof(ip6_address_t)) != 0) {
+        
         bool restart = handle->started;
         if (restart) {
             mdns_stop(handle);
         }
-        memcpy(&handle->ip, &ip, sizeof(struct ip_addr));
+        memcpy(&handle->ip, &ip, sizeof(ip_address_t));
+        memcpy(&handle->ip6, &ip6, sizeof(ip6_address_t));
         if (restart) {
             mdns_start(handle);
         }

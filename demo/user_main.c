@@ -8,8 +8,14 @@
 #include <freertos/task.h>
 
 #include <mdns/mdns.h>
+#include <lwip/ip6_addr.h>
+#include <lwip/ip4_addr.h>
+#include <lwip/netif.h>
 
 mdnsHandle *mdns;
+
+// internal netif list of lwip
+extern struct netif *netif_list;
 
 void startup(void *userData);
 
@@ -66,14 +72,31 @@ void ICACHE_FLASH_ATTR wifi_event_handler_cb(System_Event_t *event) {
     static int running = 0;
 
     if (event->event_id == EVENT_STAMODE_GOT_IP) {
+        // Try to find the IPv6 address to use
+        struct netif *interface = netif_list;
+        ip6_address_t address6 = { 0 };
+        ip_address_t address4 = { 0 };
+        memcpy(&address4, &event->event_info.got_ip.ip, sizeof(ip_address_t));
+
+        while (interface != NULL) {
+            for (int i = 0; i < LWIP_IPV6_NUM_ADDRESSES; i++) {
+                if (ip6_addr_ispreferred(netif_ip6_addr_state(interface, i))) {
+                    memcpy(&address6, netif_ip6_addr(interface, i), sizeof(ip6_address_t));
+                    break;
+                }
+            }
+            interface = interface->next;
+        }
+
+
         if (running) {
-			mdns_update_ip(mdns, event->event_info.got_ip.ip);
+			mdns_update_ip(mdns, address4, address6);
             return;
         }
         running = 1;
 
 		mdns = mdns_create("esp8266");
-		mdns_update_ip(mdns, event->event_info.got_ip.ip);    
+		mdns_update_ip(mdns, address4, address6);    
 		startup(NULL);
     }
 }
